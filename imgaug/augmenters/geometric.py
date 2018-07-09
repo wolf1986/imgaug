@@ -123,6 +123,19 @@ class Affine(Augmenter):
             * If a StochasticParameter, then this parameter will be used to
               sample the shear value per image.
 
+    transform_center_pt : tuple of to floats/ints or None, optional(default=None)
+        Define the center point of translation, image will be shifted to this
+        point before the transformation, and shifted back afterwards.
+            * By default, if None, the center of the transform is the center of the image.
+            * Translation center is specific to each image, so it makes sense to specify one only while
+              working with a single image at a time.
+            * Important note: Preceding augmentations might move the area of the image that is denoted
+              by the given point. Use this parameter only if previous augmentations in the sequence guarantee
+              the consistence of the desired point.
+
+              e.g. In a sequential model, first transformation flips the image horizontally,
+                and the second transformation (Affine) wants to use some point as transformation center.
+
     order : int or iterable of int or ia.ALL or StochasticParameter, optional(default=1)
         Interpolation order to use. Same meaning as in
         skimage:
@@ -280,7 +293,7 @@ class Affine(Augmenter):
 
     def __init__(self, scale=1.0, translate_percent=None, translate_px=None,
                  rotate=0.0, shear=0.0, order=1, cval=0, mode="constant",
-                 backend="auto",
+                 backend="auto", transform_center_pt=None,
                  name=None, deterministic=False, random_state=None):
         super(Affine, self).__init__(name=name, deterministic=deterministic, random_state=random_state)
 
@@ -477,6 +490,22 @@ class Affine(Augmenter):
         else:
             raise Exception("Expected float, int, tuple/list with 2 entries or StochasticParameter. Got %s." % (type(shear),))
 
+        # transform_center_pt
+        # (float or int, float or int) | [float or int, float or int] | None
+        self.transform_center_pt = None
+        if ia.is_iterable(transform_center_pt):
+            ia.do_assert(
+                len(transform_center_pt) == 2,
+                "Expected point with two entries - x & y, got %d entries." % (len(shear),)
+            )
+            ia.do_assert(
+                all([ia.is_single_number(val) for val in transform_center_pt]),
+                "Expected floats/ints in point coordinates tuple/list."
+            )
+            self.transform_center_pt = transform_center_pt
+        elif transform_center_pt:
+            ia.asse
+
     def _augment_images(self, images, random_state, parents, hooks):
         nb_images = len(images)
         scale_samples, translate_samples, rotate_samples, shear_samples, cval_samples, mode_samples, order_samples = self._draw_samples(nb_images, random_state)
@@ -561,8 +590,12 @@ class Affine(Augmenter):
 
         for i, keypoints_on_image in enumerate(keypoints_on_images):
             height, width = keypoints_on_image.height, keypoints_on_image.width
-            shift_x = width / 2.0 - 0.5
-            shift_y = height / 2.0 - 0.5
+            if not self.transform_center_pt:
+                shift_x = width / 2.0 - 0.5
+                shift_y = height / 2.0 - 0.5
+            else:
+                shift_x, shift_y = float(self.transform_center_pt[0]), float(self.transform_center_pt[1])
+
             scale_x, scale_y = scale_samples[0][i], scale_samples[1][i]
             translate_x, translate_y = translate_samples[0][i], translate_samples[1][i]
             #ia.do_assert(isinstance(translate_x, (float, int)))
@@ -640,8 +673,11 @@ class Affine(Augmenter):
 
     def _warp_skimage(self, image, scale_x, scale_y, translate_x_px, translate_y_px, rotate, shear, cval, mode, order):
         height, width = image.shape[0], image.shape[1]
-        shift_x = width / 2.0 - 0.5
-        shift_y = height / 2.0 - 0.5
+        if not self.transform_center_pt:
+            shift_x = width / 2.0 - 0.5
+            shift_y = height / 2.0 - 0.5
+        else:
+            shift_x, shift_y = float(self.transform_center_pt[0]), float(self.transform_center_pt[1])
 
         matrix_to_topleft = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
         matrix_transforms = tf.AffineTransform(
@@ -667,8 +703,11 @@ class Affine(Augmenter):
 
     def _warp_cv2(self, image, scale_x, scale_y, translate_x_px, translate_y_px, rotate, shear, cval, mode, order):
         height, width = image.shape[0], image.shape[1]
-        shift_x = width / 2.0 - 0.5
-        shift_y = height / 2.0 - 0.5
+        if not self.transform_center_pt:
+            shift_x = width / 2.0 - 0.5
+            shift_y = height / 2.0 - 0.5
+        else:
+            shift_x, shift_y = float(self.transform_center_pt[0]), float(self.transform_center_pt[1])
 
         matrix_to_topleft = tf.SimilarityTransform(translation=[-shift_x, -shift_y])
         matrix_transforms = tf.AffineTransform(

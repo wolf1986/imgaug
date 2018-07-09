@@ -7244,7 +7244,8 @@ def test_Affine():
                                       ia.Keypoint(x=2, y=2)], shape=base_img.shape)]
 
     # no translation/scale/rotate/shear, shouldnt change nothing
-    aug = iaa.Affine(scale=1.0, translate_px=0, rotate=0, shear=0)
+    center_pt = (base_img.shape[1] / 2, base_img.shape[0] / 2)
+    aug = iaa.Affine(scale=1.0, translate_px=0, rotate=0, shear=0, transform_center_pt=center_pt)
     aug_det = aug.to_deterministic()
 
     observed = aug.augment_images(images)
