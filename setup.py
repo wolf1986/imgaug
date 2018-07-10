@@ -17,7 +17,7 @@ Supports augmentation of images and keypoints/landmarks in a variety of differen
 
 setup(
     name="imgaug",
-    version="0.2.6",
+    version="0.2.6-fork",
     author="Alexander Jung",
     author_email="kontakt@ajung.name",
     url="https://github.com/aleju/imgaug",
